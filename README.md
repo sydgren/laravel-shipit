@@ -16,7 +16,7 @@ Drop it into any Laravel project, point it at a ShipIt site, and deploy from you
 ## Installation
 
 ```bash
-composer require sydgren/shipit-deployer
+composer require sydgren/laravel-shipit
 ```
 
 The service provider is auto-discovered. Optionally publish the config:

@@ -1,5 +1,5 @@
 {
-    "name": "sydgren/shipit-deployer",
+    "name": "sydgren/laravel-shipit",
     "description": "Trigger and monitor ShipIt deployments from Artisan — php artisan shipit:deploy.",
     "keywords": ["laravel", "deployment", "shipit", "ci", "artisan"],
     "homepage": "https://shipit.henriknordquist.dk",
