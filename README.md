@@ -49,6 +49,7 @@ once per project and `php artisan shipit:deploy` just works.
 | `shipit:deployments {site?} {--limit=10}` | List recent deployments |
 | `shipit:rollback {deployment}` | Roll back to a previous successful deployment |
 | `shipit:sites` | List all sites on your account (handy for finding ids) |
+| `shipit:script {site?} {--check} {--force} {--print}` | Scaffold or validate `.shipit/deploy.yml` |
 
 `{site}` accepts either a numeric ShipIt id or a domain/name. When omitted,
 commands fall back to `SHIPIT_SITE`.
@@ -70,6 +71,48 @@ php artisan shipit:deployments      # find the id of a good release
 php artisan shipit:rollback 1234
 ```
 
+### Deployment steps in the repository
+
+By default a site's deployment steps are configured in ShipIt. Commit a
+`.shipit/deploy.yml` and the repository takes over instead — the steps are then
+versioned and reviewed with the code they deploy.
+
+```bash
+# Write the file from what the site runs today, so you start from a known-good script
+php artisan shipit:script
+
+# Check it before pushing (no API token needed — safe in CI)
+php artisan shipit:script --check
+```
+
+```yaml
+# .shipit/deploy.yml
+steps:
+  - name: Install Composer Dependencies
+    script: composer install --no-dev --optimize-autoloader --no-interaction
+
+  - name: Migrate and warm up
+    script: |
+      php artisan migrate --force
+      php artisan optimize
+
+  - name: Build assets
+    critical: false
+    script: |
+      npm ci
+      npm run build
+```
+
+Steps run in order, in the new release directory, before the symlink switches.
+`critical` defaults to **true** here — a failing step stops the deployment
+unless you say otherwise. `enabled: false` keeps a step in the file without
+running it. The same `{RELEASE_PATH}`, `{SHARED_PATH}`, `{BASE_PATH}`,
+`{PREVIOUS_RELEASE}`, `{BRANCH}`, `{COMMIT}`, `{COMMIT_SHORT}`, `{DOMAIN}` and
+`{PHP_VERSION}` variables are available as in the UI.
+
+ShipIt validates the file again when it deploys, and a malformed file fails the
+deployment rather than silently falling back to the site's own steps.
+
 ### In CI (GitHub Actions)
 
 ```yaml
@@ -78,6 +121,13 @@ php artisan shipit:rollback 1234
   env:
     SHIPIT_TOKEN: ${{ secrets.SHIPIT_TOKEN }}
     SHIPIT_SITE: ${{ vars.SHIPIT_SITE }}
+```
+
+Validate a committed deployment script on every pull request:
+
+```yaml
+- name: Check deployment script
+  run: php artisan shipit:script --check
 ```
 
 ## Programmatic use
