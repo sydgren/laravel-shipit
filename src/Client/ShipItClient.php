@@ -95,6 +95,37 @@ class ShipItClient
     }
 
     /**
+     * The site's effective deployment steps, plus the script variables they
+     * may use.
+     *
+     * @return array{steps: list<array<string, mixed>>, variables: list<array{name: string, description: string}>}
+     */
+    public function deploymentSteps(int $siteId): array
+    {
+        $body = $this->get("sites/{$siteId}/deployment-steps");
+
+        return [
+            'steps' => $body['steps'] ?? [],
+            'variables' => $body['variables'] ?? [],
+        ];
+    }
+
+    /**
+     * The site's steps rendered as a committable `.shipit/deploy.yml`.
+     *
+     * @return array{path: string, contents: string}
+     */
+    public function deploymentScriptScaffold(int $siteId): array
+    {
+        $body = $this->get("sites/{$siteId}/deployment-steps/scaffold");
+
+        return [
+            'path' => (string) ($body['path'] ?? '.shipit/deploy.yml'),
+            'contents' => (string) ($body['contents'] ?? ''),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function deployment(int $deploymentId): array

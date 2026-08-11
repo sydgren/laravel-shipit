@@ -7,6 +7,7 @@ use Sydgren\ShipIt\Commands\DeployCommand;
 use Sydgren\ShipIt\Commands\DeploymentsCommand;
 use Sydgren\ShipIt\Commands\LogsCommand;
 use Sydgren\ShipIt\Commands\RollbackCommand;
+use Sydgren\ShipIt\Commands\ScriptCommand;
 use Sydgren\ShipIt\Commands\SitesCommand;
 use Sydgren\ShipIt\Commands\StatusCommand;
 use Illuminate\Http\Client\Factory;
@@ -44,6 +45,7 @@ class ShipItServiceProvider extends ServiceProvider
                 RollbackCommand::class,
                 DeploymentsCommand::class,
                 SitesCommand::class,
+                ScriptCommand::class,
             ]);
         }
     }
