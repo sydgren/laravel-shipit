@@ -12,7 +12,7 @@ class StatusCommand extends Command
     protected function run2(): int
     {
         $siteId = $this->resolveSiteId($this->argument('site'));
-        $deployment = $this->shipit->deployments($siteId)->first();
+        $deployment = $this->shipit->deployments($siteId, limit: 1)->first();
 
         if ($deployment === null) {
             $this->components->warn('This site has no deployments yet.');

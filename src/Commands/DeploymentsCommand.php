@@ -15,7 +15,7 @@ class DeploymentsCommand extends Command
         $siteId = $this->resolveSiteId($this->argument('site'));
         $limit = max(1, (int) $this->option('limit'));
 
-        $deployments = $this->shipit->deployments($siteId)->take($limit);
+        $deployments = $this->shipit->deployments($siteId, $limit);
 
         if ($deployments->isEmpty()) {
             $this->components->warn('This site has no deployments yet.');
