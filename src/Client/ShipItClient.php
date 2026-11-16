@@ -95,33 +95,21 @@ class ShipItClient
     }
 
     /**
-     * The site's effective deployment steps, plus the script variables they
-     * may use.
+     * The deploy script stored for the site: its own script, or ShipIt's
+     * default for its type when it has none (`is_default`).
      *
-     * @return array{steps: list<array<string, mixed>>, variables: list<array{name: string, description: string}>}
+     * A `.shipit/deploy.sh` committed in the repository overrides it at
+     * deploy time; ShipIt cannot see that file until it deploys.
+     *
+     * @return array{script: string, is_default: bool}
      */
-    public function deploymentSteps(int $siteId): array
+    public function deploymentScript(int $siteId): array
     {
-        $body = $this->get("sites/{$siteId}/deployment-steps");
+        $body = $this->get("sites/{$siteId}/deployment-script");
 
         return [
-            'steps' => $body['steps'] ?? [],
-            'variables' => $body['variables'] ?? [],
-        ];
-    }
-
-    /**
-     * The site's steps rendered as a committable `.shipit/deploy.yml`.
-     *
-     * @return array{path: string, contents: string}
-     */
-    public function deploymentScriptScaffold(int $siteId): array
-    {
-        $body = $this->get("sites/{$siteId}/deployment-steps/scaffold");
-
-        return [
-            'path' => (string) ($body['path'] ?? '.shipit/deploy.yml'),
-            'contents' => (string) ($body['contents'] ?? ''),
+            'script' => (string) ($body['script'] ?? ''),
+            'is_default' => (bool) ($body['is_default'] ?? false),
         ];
     }
 
@@ -142,11 +130,14 @@ class ShipItClient
     }
 
     /**
+     * The site's deployments, newest first. With a limit, paging stops once
+     * that many are fetched instead of walking the whole history.
+     *
      * @return Collection<int, array<string, mixed>>
      */
-    public function deployments(int $siteId): Collection
+    public function deployments(int $siteId, ?int $limit = null): Collection
     {
-        return $this->paginate("sites/{$siteId}/deployments");
+        return $this->paginate("sites/{$siteId}/deployments", $limit);
     }
 
     /**
@@ -161,9 +152,13 @@ class ShipItClient
         return $this->unwrap($response, 'deployment');
     }
 
+    /**
+     * Whether the deployment has yet to finish. `queued` is a push waiting
+     * for the site's current deployment to end.
+     */
     public function isRunning(string $status): bool
     {
-        return in_array($status, ['pending', 'running'], true);
+        return in_array($status, ['queued', 'pending', 'running'], true);
     }
 
     public function isSuccessful(string $status): bool
@@ -198,11 +193,12 @@ class ShipItClient
     }
 
     /**
-     * Walk Laravel pagination, returning every "data" row.
+     * Walk Laravel pagination, returning every "data" row, or the first
+     * `$limit` rows.
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function paginate(string $path): Collection
+    private function paginate(string $path, ?int $limit = null): Collection
     {
         $rows = collect();
         $page = 1;
@@ -216,9 +212,9 @@ class ShipItClient
 
             $lastPage = (int) ($body['meta']['last_page'] ?? 1);
             $page++;
-        } while ($page <= $lastPage);
+        } while ($page <= $lastPage && ($limit === null || $rows->count() < $limit));
 
-        return $rows->values();
+        return ($limit === null ? $rows : $rows->take($limit))->values();
     }
 
     /**

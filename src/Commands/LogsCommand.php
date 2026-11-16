@@ -38,7 +38,7 @@ class LogsCommand extends Command
         }
 
         $siteId = $this->resolveSiteId($this->option('site'));
-        $latest = $this->shipit->deployments($siteId)->first();
+        $latest = $this->shipit->deployments($siteId, limit: 1)->first();
 
         if ($latest === null) {
             $this->components->warn('This site has no deployments yet.');

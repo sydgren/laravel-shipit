@@ -49,7 +49,7 @@ once per project and `php artisan shipit:deploy` just works.
 | `shipit:deployments {site?} {--limit=10}` | List recent deployments |
 | `shipit:rollback {deployment}` | Roll back to a previous successful deployment |
 | `shipit:sites` | List all sites on your account (handy for finding ids) |
-| `shipit:script {site?} {--check} {--force} {--print}` | Scaffold or validate `.shipit/deploy.yml` |
+| `shipit:script {site?} {--check} {--force} {--print}` | Scaffold `.shipit/deploy.sh`, or check which deploy script ShipIt runs |
 
 `{site}` accepts either a numeric ShipIt id or a domain/name. When omitted,
 commands fall back to `SHIPIT_SITE`.
@@ -71,47 +71,54 @@ php artisan shipit:deployments      # find the id of a good release
 php artisan shipit:rollback 1234
 ```
 
-### Deployment steps in the repository
+### The deploy script in the repository
 
-By default a site's deployment steps are configured in ShipIt. Commit a
-`.shipit/deploy.yml` and the repository takes over instead — the steps are then
-versioned and reviewed with the code they deploy.
+A site's deploy is one bash script. On every deployment ShipIt picks it in this
+order:
+
+1. `.shipit/deploy.sh` committed in the repository
+2. the site's own script, stored in ShipIt
+3. ShipIt's default script for the site's type
+
+Commit a `.shipit/deploy.sh` and the script is versioned and reviewed with the
+code it deploys.
 
 ```bash
-# Write the file from what the site runs today, so you start from a known-good script
+# Write .shipit/deploy.sh from the script the site runs today (refuses to overwrite without --force)
 php artisan shipit:script
 
-# Check it before pushing (no API token needed — safe in CI)
+# Which script does the next deployment run? With a .shipit/deploy.sh present this
+# also syntax-checks it with `bash -n`, and needs no API token — safe in CI.
 php artisan shipit:script --check
+
+# Print the site's script from ShipIt, e.g. to diff it against the committed one
+php artisan shipit:script --print | diff - .shipit/deploy.sh
 ```
 
-```yaml
-# .shipit/deploy.yml
-steps:
-  - name: Install Composer Dependencies
-    script: composer install --no-dev --optimize-autoloader --no-interaction
+ShipIt runs the script with bash under `set -eo pipefail`, in the new release
+directory, before the release goes live — a failing command stops the
+deployment and the previous release keeps serving. Append `|| true` to a
+command that may fail. These variables are exported: `RELEASE_PATH`,
+`SHARED_PATH`, `BASE_PATH`, `PREVIOUS_RELEASE`, `BRANCH`, `COMMIT`,
+`COMMIT_SHORT`, `DOMAIN` and `PHP_VERSION`.
 
-  - name: Migrate and warm up
-    script: |
-      php artisan migrate --force
-      php artisan optimize
+```bash
+#!/usr/bin/env bash
+# .shipit/deploy.sh
+rm -rf "$RELEASE_PATH/storage"
+ln -nfs "$SHARED_PATH/storage" "$RELEASE_PATH/storage"
+ln -nfs "$SHARED_PATH/.env" "$RELEASE_PATH/.env"
 
-  - name: Build assets
-    critical: false
-    script: |
-      npm ci
-      npm run build
+composer install --no-dev --optimize-autoloader --no-interaction
+php artisan migrate --force
+php artisan optimize
+
+npm ci
+npm run build
 ```
 
-Steps run in order, in the new release directory, before the symlink switches.
-`critical` defaults to **true** here — a failing step stops the deployment
-unless you say otherwise. `enabled: false` keeps a step in the file without
-running it. The same `{RELEASE_PATH}`, `{SHARED_PATH}`, `{BASE_PATH}`,
-`{PREVIOUS_RELEASE}`, `{BRANCH}`, `{COMMIT}`, `{COMMIT_SHORT}`, `{DOMAIN}` and
-`{PHP_VERSION}` variables are available as in the UI.
-
-ShipIt validates the file again when it deploys, and a malformed file fails the
-deployment rather than silently falling back to the site's own steps.
+`.shipit/deploy.yml` is no longer read by ShipIt (removed in ShipIt 2.1.0).
+Move its steps into `.shipit/deploy.sh` and delete it.
 
 ### In CI (GitHub Actions)
 
@@ -123,10 +130,10 @@ deployment rather than silently falling back to the site's own steps.
     SHIPIT_SITE: ${{ vars.SHIPIT_SITE }}
 ```
 
-Validate a committed deployment script on every pull request:
+Syntax-check a committed `.shipit/deploy.sh` on every pull request (no token needed):
 
 ```yaml
-- name: Check deployment script
+- name: Check deploy script
   run: php artisan shipit:script --check
 ```
 

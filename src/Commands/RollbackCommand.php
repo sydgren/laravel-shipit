@@ -19,10 +19,12 @@ class RollbackCommand extends Command
             return self::SUCCESS;
         }
 
+        // Synchronous on ShipIt's side: a failed rollback comes back as an
+        // error, and a completed one carries the status `rolled_back`.
         $result = $this->shipit->rollback($deploymentId);
 
-        $this->components->info("Rolled back. New deployment #{$result['id']} ({$result['status']}).");
+        $this->components->info("Rolled back to deployment #{$deploymentId}. Recorded as deployment #{$result['id']}.");
 
-        return $this->shipit->isSuccessful((string) $result['status']) ? self::SUCCESS : self::FAILURE;
+        return self::SUCCESS;
     }
 }
